@@ -38,6 +38,43 @@ ipcMain.handle('data:save-excel', async (_event, buffer, defaultName) => {
   return result.filePath;
 });
 
+ipcMain.handle('data:export-json', async (_event, jsonString, defaultName) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: defaultName,
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  });
+  if (result.canceled || !result.filePath) return null;
+  await fs.writeFile(result.filePath, jsonString, 'utf8');
+  return result.filePath;
+});
+
+ipcMain.handle('data:import-json', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile']
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const content = await fs.readFile(result.filePaths[0], 'utf8');
+  return content;
+});
+
+ipcMain.handle('data:backup-current', async () => {
+  const userDataPath = app.getPath('userData');
+  const dataPath = path.join(userDataPath, 'kiln-data.json');
+  try {
+    await fs.access(dataPath);
+  } catch {
+    return null;
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const backupPath = path.join(
+    userDataPath,
+    `kiln-data.backup-${timestamp}.json`
+  );
+  await fs.copyFile(dataPath, backupPath);
+  return backupPath;
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,

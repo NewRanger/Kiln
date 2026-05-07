@@ -198,6 +198,12 @@ button {
   color: #fff;
 }
 
+.header-button-group {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
 .distribute-button {
   appearance: none;
   border: 0;
@@ -791,10 +797,58 @@ button {
   visibility: visible;
 }
 
-/* While the conflict tooltip is open, lift the topic-name above adjacent
+/* While a hover tooltip is open, lift the topic-name above adjacent
    topic rows so the tooltip can extend downward without being clipped. */
-.topic-name:has(.topic-conflict-icon-wrap:hover) {
+.topic-name:has(.topic-conflict-icon-wrap:hover),
+.topic-name:has(.topic-note-icon-wrap:hover) {
   z-index: 4;
+}
+
+.topic-note-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.topic-note-icon {
+  color: var(--text-muted);
+  display: block;
+  transition: color 120ms ease;
+}
+
+.topic-note-icon-wrap:hover .topic-note-icon {
+  color: var(--text);
+}
+
+.topic-note-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -4px;
+  background: #1f1f1d;
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  line-height: 1.4;
+  text-align: left;
+  max-width: 320px;
+  width: max-content;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 50;
+}
+
+.topic-note-icon-wrap:hover .topic-note-tooltip {
+  opacity: 1;
+  visibility: visible;
 }
 
 .topic-conflict-tooltip-title {
@@ -1462,4 +1516,32 @@ button {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+/* Toast (export/import feedback) */
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: #1f1f1d;
+  color: #fff;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  z-index: 200;
+  max-width: 420px;
+  animation: toast-fade-in 200ms ease-out;
+}
+
+@keyframes toast-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

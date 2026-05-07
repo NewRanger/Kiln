@@ -1,4 +1,4 @@
-import { FileSpreadsheet, Moon, Sun } from 'lucide-react';
+import { Download, FileSpreadsheet, Moon, Sun, Upload } from 'lucide-react';
 import { version } from '../../package.json';
 
 const STATUS_LABEL = {
@@ -21,6 +21,8 @@ export default function Header({
   activeTeam,
   onDistribute,
   onExportExcel,
+  onExportJson,
+  onImportJson,
   themePref,
   effectiveTheme,
   onCycleTheme
@@ -54,6 +56,26 @@ export default function Header({
       </nav>
 
       <div className="header-right">
+        <div className="header-button-group">
+          <button
+            type="button"
+            className="header-icon-button"
+            onClick={onExportJson}
+            aria-label="Export data (JSON)"
+            title="Export data (JSON)"
+          >
+            <Download size={16} />
+          </button>
+          <button
+            type="button"
+            className="header-icon-button"
+            onClick={onImportJson}
+            aria-label="Import data (JSON)"
+            title="Import data (JSON)"
+          >
+            <Upload size={16} />
+          </button>
+        </div>
         <button
           type="button"
           className="header-icon-button"

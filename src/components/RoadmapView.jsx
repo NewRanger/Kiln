@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Eraser } from 'lucide-react';
+import { AlertTriangle, Eraser, StickyNote } from 'lucide-react';
 import { computeConflicts, getTopicConflicts } from '../lib/conflicts.js';
 import { genId } from '../lib/defaults.js';
 import { absToQS, formatSprintRange, sprintDates } from '../lib/schedule.js';
@@ -416,14 +416,15 @@ export default function RoadmapView({ state, setState }) {
       {teamTopics.map((t) => {
         const topicConflicts = getTopicConflicts(conflicts, t.id);
         const hasConflicts = topicConflicts.length > 0;
+        const hasNotes = (t.notes ?? '').trim().length > 0;
         return (
           <div className="topic-row" key={t.id} data-topic-id={t.id}>
             <button
               type="button"
               className={`topic-name${hasConflicts ? ' topic-name-conflict' : ''}`}
               onClick={() => setSelectedTopicId(t.id)}
-              title={t.name}
             >
+              {hasNotes && <NoteBadge notes={t.notes} />}
               {hasConflicts && (
                 <ConflictBadge
                   topicConflicts={topicConflicts}
@@ -516,6 +517,19 @@ function SprintHeaderCell({ quarterName, sprintInQuarter, dateRange }) {
         <div className="sprint-tooltip-date">{dateRange}</div>
       </div>
     </div>
+  );
+}
+
+function NoteBadge({ notes }) {
+  const display = notes.length > 300 ? `${notes.slice(0, 280)}…` : notes;
+  return (
+    <span
+      className="topic-note-icon-wrap"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <StickyNote size={14} className="topic-note-icon" />
+      <span className="topic-note-tooltip" role="tooltip">{display}</span>
+    </span>
   );
 }
 
