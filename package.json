@@ -1,0 +1,56 @@
+{
+  "name": "kiln",
+  "version": "0.1.0",
+  "description": "Sprint roadmap planning tool for product owners",
+  "main": "electron/main.cjs",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -n vite,electron -c blue,magenta \"npm:dev:vite\" \"npm:dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 node scripts/run-electron.js",
+    "build": "vite build",
+    "start": "npm run build && node scripts/run-electron.js",
+    "build:exe": "npm run build && electron-builder --publish never",
+    "icons": "node scripts/generate-icons.js"
+  },
+  "build": {
+    "appId": "com.kiln.app",
+    "productName": "Kiln",
+    "directories": {
+      "output": "release",
+      "buildResources": "build-resources"
+    },
+    "files": ["dist/**/*", "electron/**/*", "package.json"],
+    "asar": true,
+    "win": {
+      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "icon": "build-resources/icon.ico",
+      "artifactName": "Kiln-${version}-portable.${ext}"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "icon": "build-resources/icon.icns",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "artifactName": "Kiln-${version}-${arch}.${ext}"
+    },
+    "publish": null
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^26.8.1",
+    "png2icons": "^2.0.1",
+    "vite": "^6.0.3",
+    "wait-on": "^8.0.1"
+  }
+}
