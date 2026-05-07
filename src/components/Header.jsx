@@ -27,8 +27,9 @@ export default function Header({
   effectiveTheme,
   onCycleTheme
 }) {
-  const ThemeIcon = effectiveTheme === 'dark' ? Moon : Sun;
-  const themeTitle = `Theme: ${THEME_LABEL[themePref] ?? 'System'}`;
+  const ThemeIcon = effectiveTheme === 'dark' ? Sun : Moon;
+  const nextTheme = effectiveTheme === 'dark' ? 'light' : 'dark';
+  const themeTitle = `Switch to ${nextTheme} mode (current: ${THEME_LABEL[themePref] ?? 'System'})`;
 
   return (
     <header className="header">
