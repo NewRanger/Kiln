@@ -2,11 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { absToQS, formatSprintRange, qsToAbs } from '../lib/schedule.js';
 
-export default function SprintPicker({ value, onChange, quarters, calendar }) {
+export default function SprintPicker({
+  value,
+  onChange,
+  quarters,
+  calendar,
+  placeholder = '— select sprint —'
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  const current = absToQS(value, quarters);
+  const current = value != null ? absToQS(value, quarters) : null;
 
   useEffect(() => {
     if (!open) return;
@@ -27,7 +33,7 @@ export default function SprintPicker({ value, onChange, quarters, calendar }) {
 
   const buttonLabel = current
     ? `${current.quarter.name} S${current.sprint} · ${formatSprintRange(value, calendar)}`
-    : '— select sprint —';
+    : placeholder;
 
   return (
     <div className="sprint-picker" ref={ref}>

@@ -14,7 +14,7 @@ export function getDefaultState() {
   const teamId = 'team-1';
 
   return {
-    version: 1,
+    version: 5,
     teams: [
       {
         id: teamId,

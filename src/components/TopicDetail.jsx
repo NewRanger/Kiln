@@ -1,28 +1,7 @@
-import { useEffect, useMemo } from 'react';
-import { Trash2, X } from 'lucide-react';
-import { applyRoleEstimate, autoAllocate } from '../lib/scheduler.js';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowDown, MoveHorizontal, Plus, Trash2, X } from 'lucide-react';
+import { autoAllocate } from '../lib/scheduler.js';
 import SprintPicker from './SprintPicker.jsx';
-
-const DEV_ROLE_TO_ESTIMATE = {
-  designer: 'design',
-  frontend: 'frontend',
-  middle: 'middle',
-  backend: 'backend'
-};
-
-const ROLE_TO_DEV_COUNT_KEY = {
-  design: 'designDevCount',
-  frontend: 'feDevCount',
-  middle: 'meDevCount',
-  backend: 'beDevCount'
-};
-
-const DEV_COUNT_KEY_TO_ROLE = {
-  designDevCount: 'design',
-  feDevCount: 'frontend',
-  meDevCount: 'middle',
-  beDevCount: 'backend'
-};
 
 const STATUSES = [
   { value: 'done', label: 'Done' },
@@ -30,31 +9,25 @@ const STATUSES = [
   { value: 'backlog', label: 'Backlog' }
 ];
 
-const ESTIMATE_FIELDS = [
-  { key: 'design', label: 'Design' },
-  { key: 'frontend', label: 'Frontend' },
-  { key: 'middle', label: 'Middle' },
-  { key: 'backend', label: 'Backend' }
+const ROLE_CARDS = [
+  { role: 'designer', label: 'Designer' },
+  { role: 'frontend', label: 'Frontend' },
+  { role: 'middle', label: 'Middle' },
+  { role: 'backend', label: 'Backend' }
 ];
 
-const DEV_COUNT_FIELDS = [
-  { key: 'designDevCount', label: 'Design' },
-  { key: 'feDevCount', label: 'Frontend' },
-  { key: 'meDevCount', label: 'Middle' },
-  { key: 'beDevCount', label: 'Backend' }
-];
-
-function clampNum(value, min, max, step) {
+function clampSprints(value) {
   const n = Number(value);
-  if (!Number.isFinite(n)) return min;
-  if (step === 0.5) {
-    return Math.max(min, Math.min(max, Math.round(n * 2) / 2));
-  }
-  return Math.max(min, Math.min(max, Math.round(n)));
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.round(n * 2) / 2);
 }
 
-function fmtCount(n) {
+function fmtTotal(n) {
   return Math.round((n ?? 0) * 10) / 10;
+}
+
+function emptyAssignments() {
+  return { designer: [], frontend: [], middle: [], backend: [] };
 }
 
 export default function TopicDetail({ topic, state, onUpdate, onDelete, onClose }) {
@@ -68,22 +41,24 @@ export default function TopicDetail({ topic, state, onUpdate, onDelete, onClose 
 
   const topicTeam = state.teams.find((t) => t.id === topic.teamId);
 
-  const allocatedByRole = useMemo(() => {
-    const result = { design: 0, frontend: 0, middle: 0, backend: 0 };
-    const devRole = new Map(state.developers.map((d) => [d.id, d.role]));
-    const allocations = topic.allocations || {};
-    const halfSprints = topic.halfSprints || {};
-    for (const devId of Object.keys(allocations)) {
-      const role = devRole.get(devId);
-      const key = DEV_ROLE_TO_ESTIMATE[role];
-      if (!key) continue;
-      const halfSet = new Set(halfSprints[devId] || []);
-      for (const sprint of allocations[devId] || []) {
-        result[key] += halfSet.has(sprint) ? 0.5 : 1;
-      }
+  const teamDevsByRole = useMemo(() => {
+    const map = { designer: [], frontend: [], middle: [], backend: [] };
+    for (const d of state.developers) {
+      if (d.teamId !== topic.teamId) continue;
+      if (map[d.role]) map[d.role].push(d);
     }
-    return result;
-  }, [topic.allocations, topic.halfSprints, state.developers]);
+    return map;
+  }, [state.developers, topic.teamId]);
+
+  const assignments = topic.assignments || emptyAssignments();
+  const overrides = topic.roleStartOverrides || {
+    designer: null,
+    frontend: null,
+    middle: null,
+    backend: null
+  };
+
+  const [pendingChanges, setPendingChanges] = useState(false);
 
   const handleDelete = () => {
     if (!window.confirm(`Delete topic "${topic.name}"?`)) return;
@@ -100,42 +75,162 @@ export default function TopicDetail({ topic, state, onUpdate, onDelete, onClose 
       allocations: result.allocations,
       halfSprints: result.halfSprints
     });
+    setPendingChanges(false);
   };
 
-  const handleEstimateChange = (role, value) => {
-    const newCount = Math.max(0, clampNum(value, 0, 999, 0.5));
-    const devCountKey = ROLE_TO_DEV_COUNT_KEY[role];
-    const devCount = topic[devCountKey] ?? 1;
-    const result = applyRoleEstimate(
-      topic,
-      state.developers,
-      role,
-      newCount,
-      devCount
-    );
+  const normalizeFirst = (list) =>
+    list.map((a, i) => (i === 0 ? { ...a, parallel: false } : a));
+
+  const updateRoleList = (role, newList, extraUpdates = {}) => {
     onUpdate({
-      allocations: result.allocations,
-      halfSprints: result.halfSprints,
-      estimates: { ...topic.estimates, [role]: newCount }
+      assignments: { ...assignments, [role]: normalizeFirst(newList) },
+      ...extraUpdates
     });
   };
 
-  const handleDevCountChange = (devCountKey, value) => {
-    const newDevCount = clampNum(value, 0, 2, 1);
-    const role = DEV_COUNT_KEY_TO_ROLE[devCountKey];
-    const currentCount = allocatedByRole[role] || 0;
-    const result = applyRoleEstimate(
-      topic,
-      state.developers,
-      role,
-      currentCount,
-      newDevCount
+  const handleAddAssignment = (role) => {
+    const roleDevs = teamDevsByRole[role] || [];
+    if (roleDevs.length === 0) return;
+    const list = assignments[role] || [];
+    const firstFree = roleDevs.find(
+      (d) => !list.some((a) => a.devId === d.id)
     );
+    const devId = (firstFree || roleDevs[0]).id;
+    updateRoleList(role, [
+      ...list,
+      { devId, sprints: 1, parallel: false }
+    ]);
+    setPendingChanges(true);
+  };
+
+  const handleChangeDev = (role, idx, newDevId) => {
+    const list = assignments[role] || [];
+    const oldDevId = list[idx]?.devId;
+    const newList = list.map((a, i) =>
+      i === idx ? { ...a, devId: newDevId } : a
+    );
+
+    if (!oldDevId || !newDevId || oldDevId === newDevId) {
+      updateRoleList(role, newList);
+      return;
+    }
+
+    const allocations = { ...(topic.allocations || {}) };
+    const halfSprints = { ...(topic.halfSprints || {}) };
+
+    const oldSprints = allocations[oldDevId] || [];
+    if (oldSprints.length > 0) {
+      const merged = Array.from(
+        new Set([...(allocations[newDevId] || []), ...oldSprints])
+      ).sort((x, y) => x - y);
+      allocations[newDevId] = merged;
+      delete allocations[oldDevId];
+    }
+
+    const oldHalves = halfSprints[oldDevId] || [];
+    if (oldHalves.length > 0) {
+      const mergedHalf = Array.from(
+        new Set([...(halfSprints[newDevId] || []), ...oldHalves])
+      ).sort((x, y) => x - y);
+      halfSprints[newDevId] = mergedHalf;
+      delete halfSprints[oldDevId];
+    }
+
+    updateRoleList(role, newList, { allocations, halfSprints });
+  };
+
+  const handleChangeSprints = (role, idx, value) => {
+    const newSprintsValue = clampSprints(value);
+    const list = assignments[role] || [];
+    const a = list[idx];
+    if (!a) return;
+
+    const devId = a.devId;
+    const newList = list.map((x, i) =>
+      i === idx ? { ...x, sprints: newSprintsValue } : x
+    );
+
+    if (!devId) {
+      updateRoleList(role, newList);
+      return;
+    }
+
+    const allocations = { ...(topic.allocations || {}) };
+    const halfSprints = { ...(topic.halfSprints || {}) };
+    const current = (allocations[devId] || []).slice().sort((x, y) => x - y);
+
+    if (current.length === 0) {
+      // No current allocation to extend/trim — Auto-allocate will place it.
+      updateRoleList(role, newList);
+      return;
+    }
+
+    const span = Math.ceil(newSprintsValue);
+    const needsHalf = newSprintsValue % 1 === 0.5;
+
+    let newSprints;
+    if (span <= 0) {
+      newSprints = [];
+    } else if (span <= current.length) {
+      newSprints = current.slice(0, span);
+    } else {
+      newSprints = current.slice();
+      let next = current[current.length - 1] + 1;
+      while (newSprints.length < span) {
+        newSprints.push(next++);
+      }
+    }
+
+    if (newSprints.length > 0) {
+      allocations[devId] = newSprints;
+    } else {
+      delete allocations[devId];
+    }
+
+    delete halfSprints[devId];
+    if (needsHalf && newSprints.length > 0) {
+      halfSprints[devId] = [newSprints[newSprints.length - 1]];
+    }
+
+    updateRoleList(role, newList, { allocations, halfSprints });
+  };
+
+  const handleToggleParallel = (role, idx) => {
+    const list = assignments[role] || [];
+    updateRoleList(
+      role,
+      list.map((a, i) =>
+        i === idx ? { ...a, parallel: !a.parallel } : a
+      )
+    );
+    setPendingChanges(true);
+  };
+
+  const handleRemoveAssignment = (role, idx) => {
+    const list = assignments[role] || [];
+    const removed = list[idx];
+    const newList = list.filter((_, i) => i !== idx);
+
+    const allocations = { ...(topic.allocations || {}) };
+    const halfSprints = { ...(topic.halfSprints || {}) };
+    if (removed?.devId) {
+      delete allocations[removed.devId];
+      delete halfSprints[removed.devId];
+    }
+
+    updateRoleList(role, newList, { allocations, halfSprints });
+  };
+
+  const handleSetOverride = (role, value) => {
     onUpdate({
-      [devCountKey]: newDevCount,
-      allocations: result.allocations,
-      halfSprints: result.halfSprints
+      roleStartOverrides: { ...overrides, [role]: value }
     });
+    setPendingChanges(true);
+  };
+
+  const handleStartAbsChange = (abs) => {
+    onUpdate({ startAbs: abs });
+    setPendingChanges(true);
   };
 
   return (
@@ -202,61 +297,52 @@ export default function TopicDetail({ topic, state, onUpdate, onDelete, onClose 
             </select>
           </div>
 
-          <section className="card">
-            <h3 className="card-title">Estimates (sprints)</h3>
-            <div className="estimates-grid">
-              {ESTIMATE_FIELDS.map(({ key, label }) => (
-                <div className="field" key={key}>
-                  <label className="field-label" htmlFor={`est-${key}`}>{label}</label>
-                  <input
-                    id={`est-${key}`}
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={fmtCount(allocatedByRole[key])}
-                    onChange={(e) => handleEstimateChange(key, e.target.value)}
-                    className="field-input"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="card">
-            <h3 className="card-title">Dev counts</h3>
-            <div className="estimates-grid">
-              {DEV_COUNT_FIELDS.map(({ key, label }) => (
-                <div className="field" key={key}>
-                  <label className="field-label" htmlFor={`dc-${key}`}>{label}</label>
-                  <input
-                    id={`dc-${key}`}
-                    type="number"
-                    min={0}
-                    max={2}
-                    step={1}
-                    value={topic[key] ?? 0}
-                    onChange={(e) => handleDevCountChange(key, e.target.value)}
-                    className="field-input"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
+          {ROLE_CARDS.map(({ role, label }) => (
+            <RoleAssignmentCard
+              key={role}
+              role={role}
+              label={label}
+              list={assignments[role] || []}
+              roleDevs={teamDevsByRole[role] || []}
+              startOverride={overrides[role] ?? null}
+              quarters={state.quarters}
+              calendar={state.sprintCalendar}
+              onChangeDev={(idx, devId) => handleChangeDev(role, idx, devId)}
+              onChangeSprints={(idx, value) =>
+                handleChangeSprints(role, idx, value)
+              }
+              onToggleParallel={(idx) => handleToggleParallel(role, idx)}
+              onRemove={(idx) => handleRemoveAssignment(role, idx)}
+              onAdd={() => handleAddAssignment(role)}
+              onSetOverride={(value) => handleSetOverride(role, value)}
+            />
+          ))}
 
           <button
             type="button"
-            className="action-button"
+            className="action-button auto-allocate-button"
             style={topicTeam ? { backgroundColor: `#${topicTeam.color}` } : undefined}
             onClick={handleAutoAllocate}
+            title={
+              pendingChanges
+                ? 'Some changes affect ordering. Click to re-schedule.'
+                : undefined
+            }
           >
             Auto-allocate
+            {pendingChanges && (
+              <span
+                className="auto-allocate-pending-dot"
+                aria-label="Pending changes"
+              />
+            )}
           </button>
 
           <div className="field">
             <span className="field-label">Start sprint</span>
             <SprintPicker
               value={topic.startAbs}
-              onChange={(abs) => onUpdate({ startAbs: abs })}
+              onChange={handleStartAbsChange}
               quarters={state.quarters}
               calendar={state.sprintCalendar}
             />
@@ -284,5 +370,157 @@ export default function TopicDetail({ topic, state, onUpdate, onDelete, onClose 
         </div>
       </aside>
     </>
+  );
+}
+
+function RoleAssignmentCard({
+  role,
+  label,
+  list,
+  roleDevs,
+  startOverride,
+  quarters,
+  calendar,
+  onChangeDev,
+  onChangeSprints,
+  onToggleParallel,
+  onRemove,
+  onAdd,
+  onSetOverride
+}) {
+  const total = list.reduce((s, a) => s + (Number(a.sprints) || 0), 0);
+
+  return (
+    <section className="card role-assign-card">
+      <header className="role-assign-header">
+        <h3 className="card-title role-assign-title">{label}</h3>
+        <span className="role-assign-total">
+          total: {fmtTotal(total)} sprint{total === 1 ? '' : 's'}
+        </span>
+      </header>
+
+      <div className="role-assign-starts">
+        <span className="role-assign-starts-label">Starts:</span>
+        <div className="role-assign-starts-picker">
+          <SprintPicker
+            value={startOverride}
+            onChange={(abs) => onSetOverride(abs)}
+            quarters={quarters}
+            calendar={calendar}
+            placeholder="Auto"
+          />
+        </div>
+        {startOverride != null && (
+          <button
+            type="button"
+            className="role-assign-reset"
+            onClick={() => onSetOverride(null)}
+          >
+            Reset to auto
+          </button>
+        )}
+      </div>
+
+      {roleDevs.length === 0 ? (
+        <p className="role-assign-empty">
+          No {label.toLowerCase()} developers in this team. Add one in Settings.
+        </p>
+      ) : (
+        <>
+          {list.length === 0 && (
+            <p className="role-assign-empty">No assignments yet.</p>
+          )}
+          {list.map((a, idx) => (
+            <AssignmentRow
+              key={idx}
+              assignment={a}
+              isFirst={idx === 0}
+              roleDevs={roleDevs}
+              onChangeDev={(devId) => onChangeDev(idx, devId)}
+              onChangeSprints={(value) => onChangeSprints(idx, value)}
+              onToggleParallel={() => onToggleParallel(idx)}
+              onRemove={() => onRemove(idx)}
+            />
+          ))}
+          <button
+            type="button"
+            className="role-assign-add"
+            onClick={onAdd}
+          >
+            <Plus size={14} />
+            Add {label.toLowerCase()} dev
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
+function AssignmentRow({
+  assignment,
+  isFirst,
+  roleDevs,
+  onChangeDev,
+  onChangeSprints,
+  onToggleParallel,
+  onRemove
+}) {
+  const isParallel = !isFirst && !!assignment.parallel;
+  return (
+    <div className="assignment-row">
+      <select
+        className="field-input assignment-row-dev"
+        value={assignment.devId || ''}
+        onChange={(e) => onChangeDev(e.target.value)}
+        aria-label="Developer"
+      >
+        {!roleDevs.some((d) => d.id === assignment.devId) && (
+          <option value={assignment.devId || ''}>
+            {assignment.devId ? '(unknown dev)' : '— select —'}
+          </option>
+        )}
+        {roleDevs.map((d) => (
+          <option key={d.id} value={d.id}>{d.name}</option>
+        ))}
+      </select>
+
+      <input
+        type="number"
+        className="field-input field-input--small assignment-row-sprints"
+        min={0}
+        step={0.5}
+        value={assignment.sprints ?? 0}
+        onChange={(e) => onChangeSprints(e.target.value)}
+        aria-label="Sprints"
+      />
+      <span className="assignment-row-unit">sprints</span>
+
+      {!isFirst ? (
+        <button
+          type="button"
+          className={`assignment-row-toggle${isParallel ? ' assignment-row-toggle-parallel' : ''}`}
+          onClick={onToggleParallel}
+          title={isParallel ? 'Parallel — runs at the same time as the previous assignment' : 'Sequential — runs after the previous assignment'}
+          aria-label={isParallel ? 'Parallel' : 'Sequential'}
+        >
+          {isParallel ? <MoveHorizontal size={14} /> : <ArrowDown size={14} />}
+          <span className="assignment-row-toggle-label">
+            {isParallel ? 'Parallel' : 'Sequential'}
+          </span>
+        </button>
+      ) : (
+        <span className="assignment-row-toggle-spacer" />
+      )}
+
+      <button
+        type="button"
+        className="icon-button assignment-row-remove"
+        onClick={onRemove}
+        aria-label="Remove assignment"
+        title="Remove"
+      >
+        <X size={14} />
+      </button>
+    </div>
   );
 }

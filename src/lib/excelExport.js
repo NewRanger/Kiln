@@ -103,16 +103,14 @@ function buildRoadmapSheet(state) {
   const devsById = new Map(developers.map((d) => [d.id, d]));
   topics.forEach((topic, idx) => {
     const r = 3 + idx;
-    const e = topic.estimates || {};
-    const total =
-      (e.design || 0) + (e.frontend || 0) + (e.middle || 0) + (e.backend || 0);
+    const sums = sumAssignments(topic);
 
     setCell(sheet, r, 0, { v: topic.name, t: 's' });
-    setCell(sheet, r, 1, { v: e.design || 0, t: 'n' });
-    setCell(sheet, r, 2, { v: e.frontend || 0, t: 'n' });
-    setCell(sheet, r, 3, { v: e.middle || 0, t: 'n' });
-    setCell(sheet, r, 4, { v: e.backend || 0, t: 'n' });
-    setCell(sheet, r, 5, { v: total, t: 'n' });
+    setCell(sheet, r, 1, { v: sums.designer, t: 'n' });
+    setCell(sheet, r, 2, { v: sums.frontend, t: 'n' });
+    setCell(sheet, r, 3, { v: sums.middle, t: 'n' });
+    setCell(sheet, r, 4, { v: sums.backend, t: 'n' });
+    setCell(sheet, r, 5, { v: sums.total, t: 'n' });
 
     const sprintToDevs = new Map();
     for (const devId of Object.keys(topic.allocations || {})) {
@@ -165,14 +163,11 @@ function buildTopicsSheet(state) {
   const headers = [
     'ID', 'Name', 'Category', 'Status', 'Priority',
     'Design', 'Frontend', 'Middle', 'Backend', 'Total',
-    'Designer count', 'FE devs', 'ME devs', 'BE devs',
     'Start sprint', 'Locked', 'Notes'
   ];
 
   const rows = state.topics.map((t) => {
-    const e = t.estimates || {};
-    const total =
-      (e.design || 0) + (e.frontend || 0) + (e.middle || 0) + (e.backend || 0);
+    const sums = sumAssignments(t);
     const cat = categoriesById.get(t.categoryId);
     const qs = absToQS(t.startAbs, state.quarters);
     const startLabel = qs ? `${qs.quarter.name} S${qs.sprint}` : `S${t.startAbs}`;
@@ -182,15 +177,11 @@ function buildTopicsSheet(state) {
       cat ? cat.name : '',
       t.status,
       t.priority || 0,
-      e.design || 0,
-      e.frontend || 0,
-      e.middle || 0,
-      e.backend || 0,
-      total,
-      t.designDevCount || 0,
-      t.feDevCount || 0,
-      t.meDevCount || 0,
-      t.beDevCount || 0,
+      sums.designer,
+      sums.frontend,
+      sums.middle,
+      sums.backend,
+      sums.total,
       startLabel,
       t.locked ? 'Yes' : 'No',
       t.notes || ''
@@ -198,6 +189,28 @@ function buildTopicsSheet(state) {
   });
 
   return finalizeSheet([headers, ...rows]);
+}
+
+function sumAssignments(topic) {
+  const a = topic.assignments || {
+    designer: [],
+    frontend: [],
+    middle: [],
+    backend: []
+  };
+  const sumList = (list) =>
+    (list || []).reduce((sum, x) => sum + (Number(x.sprints) || 0), 0);
+  const designer = sumList(a.designer);
+  const frontend = sumList(a.frontend);
+  const middle = sumList(a.middle);
+  const backend = sumList(a.backend);
+  return {
+    designer,
+    frontend,
+    middle,
+    backend,
+    total: designer + frontend + middle + backend
+  };
 }
 
 function buildCapacitySheet(state) {

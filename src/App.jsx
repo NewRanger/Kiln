@@ -85,7 +85,7 @@ export default function App() {
   const handleDistribute = () => {
     if (
       !window.confirm(
-        'Re-schedule all topics based on estimates and start sprints? Locked topics will stay put.'
+        'Re-schedule all topics based on their assignments and start sprints? Locked topics will stay put.'
       )
     ) {
       return;

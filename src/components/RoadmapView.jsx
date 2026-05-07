@@ -3,6 +3,7 @@ import { AlertTriangle, Eraser, StickyNote } from 'lucide-react';
 import { computeConflicts, getTopicConflicts } from '../lib/conflicts.js';
 import { genId } from '../lib/defaults.js';
 import { absToQS, formatSprintRange, sprintDates } from '../lib/schedule.js';
+import { syncAssignmentForDev } from '../lib/scheduler.js';
 import TopicDetail from './TopicDetail.jsx';
 
 const ROLE_TRACKS = [
@@ -30,11 +31,8 @@ function makeNewTopic(state) {
     status: 'backlog',
     teamId: state.activeTeamId,
     categoryId: state.categories[0]?.id ?? null,
-    estimates: { design: 0, frontend: 0, middle: 0, backend: 0 },
-    designDevCount: 1,
-    feDevCount: 1,
-    meDevCount: 1,
-    beDevCount: 1,
+    assignments: { designer: [], frontend: [], middle: [], backend: [] },
+    roleStartOverrides: { designer: null, frontend: null, middle: null, backend: null },
     startAbs: 1,
     allocations: {},
     halfSprints: {},
@@ -138,9 +136,9 @@ export default function RoadmapView({ state, setState }) {
       ...prev,
       topics: prev.topics.map((t) => {
         if (t.id !== topicId) return t;
-        if (tool === 'eraser') return eraseAt(t, absSprint);
-        if (mode === 'add') return addDevAt(t, tool, absSprint);
-        if (mode === 'remove') return removeDevAt(t, tool, absSprint);
+        if (tool === 'eraser') return eraseAt(t, absSprint, devsById);
+        if (mode === 'add') return addDevAt(t, tool, absSprint, devsById);
+        if (mode === 'remove') return removeDevAt(t, tool, absSprint, devsById);
         return t;
       })
     }));
@@ -245,7 +243,8 @@ export default function RoadmapView({ state, setState }) {
             drag.originalDevSprints,
             drag.runStart,
             drag.originalEnd,
-            newEnd
+            newEnd,
+            devsById
           );
         })
       }));
@@ -315,7 +314,7 @@ export default function RoadmapView({ state, setState }) {
         ...prev,
         topics: prev.topics.map((t) => {
           if (t.id !== move.topicId) return t;
-          return moveRunOf(t, move, offset);
+          return moveRunOf(t, move, offset, devsById);
         })
       }));
     };
@@ -639,7 +638,7 @@ function TrackCell({
   );
 }
 
-function moveRunOf(topic, move, offset) {
+function moveRunOf(topic, move, offset, devsById) {
   const { devId, originalDevSprints, originalHalfDev, runStart, runEnd } = move;
 
   const otherDevSprints = originalDevSprints.filter(
@@ -673,10 +672,14 @@ function moveRunOf(topic, move, offset) {
   if (allHalfDev.length > 0) halfSprints[devId] = allHalfDev;
   else delete halfSprints[devId];
 
-  return { ...topic, allocations, halfSprints };
+  return syncAssignmentForDev(
+    { ...topic, allocations, halfSprints },
+    devId,
+    devsById
+  );
 }
 
-function resizeRun(topic, devId, originalDevSprints, runStart, originalEnd, newEnd) {
+function resizeRun(topic, devId, originalDevSprints, runStart, originalEnd, newEnd, devsById) {
   const allocations = { ...(topic.allocations || {}) };
   const halfSprints = { ...(topic.halfSprints || {}) };
 
@@ -698,22 +701,27 @@ function resizeRun(topic, devId, originalDevSprints, runStart, originalEnd, newE
   if (halfDevSprints.length > 0) halfSprints[devId] = halfDevSprints;
   else delete halfSprints[devId];
 
-  return { ...topic, allocations, halfSprints };
+  return syncAssignmentForDev(
+    { ...topic, allocations, halfSprints },
+    devId,
+    devsById
+  );
 }
 
-function addDevAt(topic, devId, absSprint) {
+function addDevAt(topic, devId, absSprint, devsById) {
   const existing = topic.allocations?.[devId] || [];
   if (existing.includes(absSprint)) return topic;
-  return {
+  const updated = {
     ...topic,
     allocations: {
       ...(topic.allocations || {}),
       [devId]: [...existing, absSprint]
     }
   };
+  return syncAssignmentForDev(updated, devId, devsById);
 }
 
-function removeDevAt(topic, devId, absSprint) {
+function removeDevAt(topic, devId, absSprint, devsById) {
   const existing = topic.allocations?.[devId] || [];
   if (!existing.includes(absSprint)) return topic;
 
@@ -730,16 +738,22 @@ function removeDevAt(topic, devId, absSprint) {
     else delete halfSprints[devId];
   }
 
-  return { ...topic, allocations, halfSprints };
+  return syncAssignmentForDev(
+    { ...topic, allocations, halfSprints },
+    devId,
+    devsById
+  );
 }
 
-function eraseAt(topic, absSprint) {
+function eraseAt(topic, absSprint, devsById) {
   const allocations = { ...(topic.allocations || {}) };
   const halfSprints = { ...(topic.halfSprints || {}) };
+  const affected = new Set();
 
   for (const devId of Object.keys(allocations)) {
     const sprints = allocations[devId];
     if (!sprints.includes(absSprint)) continue;
+    affected.add(devId);
     const filtered = sprints.filter((s) => s !== absSprint);
     if (filtered.length > 0) allocations[devId] = filtered;
     else delete allocations[devId];
@@ -753,5 +767,9 @@ function eraseAt(topic, absSprint) {
     else delete halfSprints[devId];
   }
 
-  return { ...topic, allocations, halfSprints };
+  let result = { ...topic, allocations, halfSprints };
+  for (const devId of affected) {
+    result = syncAssignmentForDev(result, devId, devsById);
+  }
+  return result;
 }

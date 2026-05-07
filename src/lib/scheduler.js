@@ -2,53 +2,29 @@
 // Sequencing:
 //   - Design first, starting at topic.startAbs
 //   - Middle and Backend run in parallel right after design ends
-//   - Frontend starts +1 sprint after the later of (middle start, backend start)
-//     when either has work, otherwise right after design
-// Splits when devCount === 2:
-//   - Integer estimates: ceil(N/2) to first dev, floor(N/2) to second
-//   - Half estimates (e.g. 1.5): first dev gets the whole part, second dev
-//     gets 1 sprint marked as half (in halfSprints) so the .5 reads as a
-//     half-toned cell
+//   - Frontend starts +1 sprint after the later of (middle phase START,
+//     backend phase START) when either has work, otherwise right after design
+//
+// Per-role overrides: topic.roleStartOverrides[role] (when not null) replaces
+// the auto-computed natural start for that role. Subsequent assignments
+// within the role still follow their parallel/sequential flags.
+//
+// Each role has an ordered list of assignments. Within a role, an assignment's
+// start is determined by the previous assignment's parallel/sequential flag:
+//   - sequential: starts where the previous one ended (or at the role's
+//     natural start if it's the first)
+//   - parallel: starts at the same sprint as the previous one
+// A half (.5) on `sprints` means the last sprint of that assignment is marked
+// half in `halfSprints`.
 
 const STATUS_ORDER = { 'in-progress': 0, backlog: 1, done: 2 };
 
-const ROLE_TO_DEV_ROLE = {
-  design: 'designer',
-  frontend: 'frontend',
-  middle: 'middle',
-  backend: 'backend'
-};
+const ROLES = ['designer', 'frontend', 'middle', 'backend'];
 
 export function autoAllocate(topic, developers, _quarters) {
-  return computeSchedule(topic, developers, {});
-}
-
-// Re-allocate a single role's sprints in this topic. Clears existing entries
-// for every dev of the role on the topic's team, then redistributes `count`
-// sprint-units across the first `devCount` devs starting at topic.startAbs.
-// Half-step counts (e.g. 1.5) follow the same split rules as the auto-allocator.
-export function applyRoleEstimate(topic, developers, role, count, devCount) {
-  const devRole = ROLE_TO_DEV_ROLE[role];
-  const allocations = { ...(topic.allocations || {}) };
-  const halfSprints = { ...(topic.halfSprints || {}) };
-
-  if (!devRole) return { allocations, halfSprints };
-
-  const teamDevs = developers.filter((d) => d.teamId === topic.teamId);
-  const allDevsOfRole = teamDevs.filter((d) => d.role === devRole);
-
-  for (const dev of allDevsOfRole) {
-    delete allocations[dev.id];
-    delete halfSprints[dev.id];
-  }
-
-  if (count <= 0 || devCount <= 0 || allDevsOfRole.length === 0) {
-    return { allocations, halfSprints };
-  }
-
-  const devsToUse = allDevsOfRole.slice(0, devCount);
-  allocateRole(allocations, halfSprints, devsToUse, topic.startAbs, count, devCount);
-  return { allocations, halfSprints };
+  const busyUntil = {};
+  for (const d of developers) busyUntil[d.id] = 0;
+  return computeSchedule(topic, developers, busyUntil);
 }
 
 // Re-schedule every unlocked topic, advancing a per-dev `busyUntil` cursor so
@@ -86,7 +62,6 @@ export function distribute(state) {
     const teamDevs = state.developers.filter((d) => d.teamId === topic.teamId);
     const result = computeSchedule(topic, teamDevs, busyUntil);
     updates.set(topic.id, result);
-    advanceBusyUntil(busyUntil, result.allocations);
   }
 
   const newTopics = state.topics.map((t) => {
@@ -104,99 +79,121 @@ export function distribute(state) {
 }
 
 function computeSchedule(topic, developers, busyUntil) {
-  const designDevs = developers
-    .filter((d) => d.role === 'designer')
-    .slice(0, topic.designDevCount);
-  const middleDevs = developers
-    .filter((d) => d.role === 'middle')
-    .slice(0, topic.meDevCount);
-  const backendDevs = developers
-    .filter((d) => d.role === 'backend')
-    .slice(0, topic.beDevCount);
-  const frontendDevs = developers
-    .filter((d) => d.role === 'frontend')
-    .slice(0, topic.feDevCount);
-
-  const maxBusy = (devList) => {
-    let max = 0;
-    for (const d of devList) {
-      const b = busyUntil[d.id] || 0;
-      if (b > max) max = b;
-    }
-    return max;
-  };
-
-  const designStart = Math.max(topic.startAbs, maxBusy(designDevs));
-  const designSpan =
-    topic.estimates.design > 0 ? Math.ceil(topic.estimates.design) : 0;
-  const designEnd = designStart + designSpan;
-
-  const middleStart = Math.max(designEnd, maxBusy(middleDevs));
-  const backendStart = Math.max(designEnd, maxBusy(backendDevs));
-
-  const hasMOrB =
-    topic.estimates.middle > 0 || topic.estimates.backend > 0;
-  let frontendStart = hasMOrB
-    ? Math.max(designEnd, middleStart, backendStart) + 1
-    : designEnd;
-  frontendStart = Math.max(frontendStart, maxBusy(frontendDevs));
-
   const allocations = {};
   const halfSprints = {};
+  const validDevIds = new Set(developers.map((d) => d.id));
 
-  allocateRole(allocations, halfSprints, designDevs, designStart, topic.estimates.design, topic.designDevCount);
-  allocateRole(allocations, halfSprints, middleDevs, middleStart, topic.estimates.middle, topic.meDevCount);
-  allocateRole(allocations, halfSprints, backendDevs, backendStart, topic.estimates.backend, topic.beDevCount);
-  allocateRole(allocations, halfSprints, frontendDevs, frontendStart, topic.estimates.frontend, topic.feDevCount);
+  const assignments = topic.assignments || {
+    designer: [],
+    frontend: [],
+    middle: [],
+    backend: []
+  };
+  const overrides = topic.roleStartOverrides || {};
+
+  const designAssignments = filterValid(assignments.designer, validDevIds);
+  const middleAssignments = filterValid(assignments.middle, validDevIds);
+  const backendAssignments = filterValid(assignments.backend, validDevIds);
+  const frontendAssignments = filterValid(assignments.frontend, validDevIds);
+
+  const designStart = resolveStart(overrides, 'designer', topic.startAbs);
+  const { end: designEnd } = placeAssignments(
+    allocations,
+    halfSprints,
+    designAssignments,
+    designStart,
+    busyUntil
+  );
+
+  const middleStartNatural = resolveStart(overrides, 'middle', designEnd);
+  const { start: middleStart } = placeAssignments(
+    allocations,
+    halfSprints,
+    middleAssignments,
+    middleStartNatural,
+    busyUntil
+  );
+
+  const backendStartNatural = resolveStart(overrides, 'backend', designEnd);
+  const { start: backendStart } = placeAssignments(
+    allocations,
+    halfSprints,
+    backendAssignments,
+    backendStartNatural,
+    busyUntil
+  );
+
+  const middleHas = middleAssignments.length > 0;
+  const backendHas = backendAssignments.length > 0;
+  let frontendAuto;
+  if (!middleHas && !backendHas) {
+    frontendAuto = designEnd;
+  } else {
+    let later = designEnd;
+    if (middleHas) later = Math.max(later, middleStart);
+    if (backendHas) later = Math.max(later, backendStart);
+    frontendAuto = later + 1;
+  }
+
+  const frontendStart = resolveStart(overrides, 'frontend', frontendAuto);
+  placeAssignments(
+    allocations,
+    halfSprints,
+    frontendAssignments,
+    frontendStart,
+    busyUntil
+  );
 
   return { allocations, halfSprints };
 }
 
-function allocateRole(allocations, halfSprints, devs, startSprint, estimate, devCount) {
-  if (estimate <= 0 || devs.length === 0 || devCount <= 0) return;
+function resolveStart(overrides, role, autoStart) {
+  const v = overrides?.[role];
+  return v != null ? v : autoStart;
+}
 
-  const actualDevCount = Math.min(devCount, devs.length);
+function placeAssignments(allocations, halfSprints, assignments, naturalStart, busyUntil) {
+  let cursor = naturalStart;
+  let prevStart = naturalStart;
+  let phaseEnd = naturalStart;
+  let phaseStart = naturalStart;
+  let foundFirst = false;
 
-  if (actualDevCount === 1) {
-    const dev = devs[0];
-    const span = Math.ceil(estimate);
-    const sprints = rangeFrom(startSprint, span);
-    pushSprints(allocations, dev.id, sprints);
+  for (let i = 0; i < assignments.length; i++) {
+    const a = assignments[i];
+    if (!a.devId || !(a.sprints > 0)) continue;
+    const span = Math.ceil(a.sprints);
+    const isParallel = i > 0 && a.parallel;
 
-    if (estimate % 1 === 0.5) {
-      pushSprints(halfSprints, dev.id, [startSprint + span - 1]);
+    const computedStart = isParallel ? prevStart : cursor;
+    const busy = busyUntil[a.devId] || 0;
+    const actualStart = Math.max(computedStart, busy);
+    const end = actualStart + span;
+
+    if (!foundFirst) {
+      phaseStart = actualStart;
+      foundFirst = true;
     }
-    return;
-  }
 
-  const whole = Math.floor(estimate);
-  const halfPart = estimate - whole;
-
-  let firstCount;
-  let secondCount;
-  let secondIsHalf = false;
-
-  if (halfPart === 0.5) {
-    firstCount = whole;
-    secondCount = 1;
-    secondIsHalf = true;
-  } else {
-    firstCount = Math.ceil(estimate / 2);
-    secondCount = Math.floor(estimate / 2);
-  }
-
-  if (firstCount > 0) {
-    const sprints = rangeFrom(startSprint, firstCount);
-    pushSprints(allocations, devs[0].id, sprints);
-  }
-
-  if (secondCount > 0) {
-    const sprints = rangeFrom(startSprint, secondCount);
-    pushSprints(allocations, devs[1].id, sprints);
-    if (secondIsHalf) {
-      pushSprints(halfSprints, devs[1].id, sprints);
+    for (let s = 0; s < span; s++) {
+      pushSprint(allocations, a.devId, actualStart + s);
     }
+    if (a.sprints % 1 === 0.5) {
+      pushSprint(halfSprints, a.devId, actualStart + span - 1);
+    }
+
+    busyUntil[a.devId] = end;
+    cursor = Math.max(cursor, end);
+    prevStart = actualStart;
+    if (end > phaseEnd) phaseEnd = end;
   }
+
+  return { start: phaseStart, end: phaseEnd };
+}
+
+function filterValid(list, validDevIds) {
+  if (!Array.isArray(list)) return [];
+  return list.filter((a) => a && a.devId && validDevIds.has(a.devId));
 }
 
 function advanceBusyUntil(busyUntil, allocations) {
@@ -212,13 +209,77 @@ function advanceBusyUntil(busyUntil, allocations) {
   }
 }
 
-function rangeFrom(start, count) {
-  const result = [];
-  for (let i = 0; i < count; i++) result.push(start + i);
-  return result;
+function pushSprint(map, devId, sprint) {
+  if (!map[devId]) map[devId] = [];
+  map[devId].push(sprint);
 }
 
-function pushSprints(map, devId, sprints) {
-  if (!map[devId]) map[devId] = [];
-  map[devId].push(...sprints);
+// Sync a single dev's assignment in `topic.assignments` to match the dev's
+// current allocation count. Used by manual paint / drag operations so the
+// drawer stays in sync with the timeline.
+//
+// - If the dev now has 0 sprints allocated, drop their assignment from the
+//   role's list (and reset the first remaining assignment's parallel flag).
+// - If the dev has an existing assignment, update its sprint count.
+// - Otherwise, append a new sequential assignment for the dev.
+export function syncAssignmentForDev(topic, devId, devsById) {
+  const dev = devsById?.[devId];
+  if (!dev) return topic;
+  const role = dev.role;
+  if (!role) return topic;
+
+  const allocations = topic.allocations || {};
+  const halfSprints = topic.halfSprints || {};
+  const sprints = allocations[devId] || [];
+  const halfSet = new Set(halfSprints[devId] || []);
+
+  let total = 0;
+  for (const s of sprints) total += halfSet.has(s) ? 0.5 : 1;
+
+  const baseAssignments = topic.assignments || {
+    designer: [],
+    frontend: [],
+    middle: [],
+    backend: []
+  };
+  const list = baseAssignments[role] || [];
+  const idx = list.findIndex((a) => a.devId === devId);
+
+  let newList;
+  if (total <= 0) {
+    if (idx === -1) return topic;
+    newList = list.filter((_, i) => i !== idx);
+    if (newList.length > 0 && newList[0].parallel) {
+      newList = [{ ...newList[0], parallel: false }, ...newList.slice(1)];
+    }
+  } else if (idx === -1) {
+    newList = [
+      ...list,
+      { devId, sprints: total, parallel: false }
+    ];
+  } else {
+    newList = list.map((a, i) =>
+      i === idx ? { ...a, sprints: total } : a
+    );
+  }
+
+  return {
+    ...topic,
+    assignments: {
+      ...baseAssignments,
+      [role]: newList
+    }
+  };
 }
+
+// Convenience: sync multiple devs at once. Used by the eraser and other
+// multi-dev paint operations.
+export function syncAssignmentsForDevs(topic, devIds, devsById) {
+  let updated = topic;
+  for (const id of devIds) {
+    updated = syncAssignmentForDev(updated, id, devsById);
+  }
+  return updated;
+}
+
+export { ROLES };
