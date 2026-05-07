@@ -1,6 +1,6 @@
 {
   "name": "kiln",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Sprint roadmap planning tool for product owners",
   "main": "electron/main.cjs",
   "private": true,
@@ -20,15 +20,34 @@
       "output": "release",
       "buildResources": "build-resources"
     },
-    "files": ["dist/**/*", "electron/**/*", "package.json"],
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
     "asar": true,
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build-resources/icon.ico",
       "artifactName": "Kiln-${version}-portable.${ext}"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "icon": "build-resources/icon.icns",
       "category": "public.app-category.productivity",
       "identity": null,
