@@ -717,6 +717,7 @@ button {
   background: var(--surface);
   display: flex;
   align-items: center;
+  gap: 0.4rem;
   padding: 0 1rem;
   font-size: 0.9375rem;
   font-family: inherit;
@@ -725,14 +726,97 @@ button {
   border: 0;
   border-right: 1px solid var(--border);
   cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   transition: background 120ms ease;
 }
 
 .topic-name:hover {
   background: var(--surface-hover);
+}
+
+.topic-name-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topic-name-conflict {
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+}
+
+.topic-name-conflict:hover {
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface));
+}
+
+.topic-conflict-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.topic-conflict-icon {
+  color: var(--warning);
+  display: block;
+}
+
+.topic-conflict-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -4px;
+  background: #1f1f1d;
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  line-height: 1.4;
+  text-align: left;
+  width: 280px;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.topic-conflict-icon-wrap:hover .topic-conflict-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* While the conflict tooltip is open, lift the topic-name above adjacent
+   topic rows so the tooltip can extend downward without being clipped. */
+.topic-name:has(.topic-conflict-icon-wrap:hover) {
+  z-index: 4;
+}
+
+.topic-conflict-tooltip-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.topic-conflict-tooltip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topic-conflict-tooltip-item {
+  font-weight: 400;
+  opacity: 0.92;
+}
+
+.topic-conflict-tooltip-more {
+  font-weight: 400;
+  opacity: 0.7;
+  margin-top: 2px;
 }
 
 .topic-tracks {
@@ -814,6 +898,11 @@ button {
 .track-cell-paintable:hover {
   outline: 2px solid color-mix(in srgb, var(--text) 35%, transparent);
   outline-offset: -2px;
+}
+
+.track-cell-conflict {
+  outline: 2px solid var(--danger);
+  outline-offset: -1px;
 }
 
 /* Paint toolbar */
@@ -1317,4 +1406,60 @@ button {
 .status-pill-over {
   background: var(--pill-danger-bg);
   color: var(--pill-danger-fg);
+}
+
+/* Conflicts card */
+.conflicts-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.conflicts-title-warning {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.conflicts-title-ok {
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+.conflicts-empty {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.conflicts-empty-icon {
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+.conflicts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.conflicts-table th,
+.conflicts-table td {
+  text-align: left;
+  padding: 0.625rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.conflicts-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.conflicts-table th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }

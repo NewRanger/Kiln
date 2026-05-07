@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
+import { AlertTriangle, Check } from 'lucide-react';
 import { computeCapacity } from '../lib/capacity.js';
+import { computeConflicts } from '../lib/conflicts.js';
+import { absToQS } from '../lib/schedule.js';
 
 const ROLES = [
   { key: 'designer', label: 'Designer' },
@@ -25,15 +28,95 @@ function fmtPercent(n) {
 
 export default function InsightsView({ state }) {
   const capacity = useMemo(() => computeCapacity(state), [state]);
+  const conflicts = useMemo(() => computeConflicts(state), [state.topics]);
   const activeTeam = state.teams.find((t) => t.id === state.activeTeamId);
   const teamColor = activeTeam ? `#${activeTeam.color}` : '#6e4fab';
 
   return (
     <div className="insights">
       <CapacityOverview capacity={capacity} teamColor={teamColor} />
+      <ConflictsCard state={state} conflicts={conflicts} />
       <RoleCardsRow capacity={capacity} />
       <CategoriesTable capacity={capacity} />
     </div>
+  );
+}
+
+function ConflictsCard({ state, conflicts }) {
+  const devsById = useMemo(() => {
+    const map = {};
+    for (const d of state.developers) map[d.id] = d;
+    return map;
+  }, [state.developers]);
+
+  const topicsById = useMemo(() => {
+    const map = {};
+    for (const t of state.topics) map[t.id] = t;
+    return map;
+  }, [state.topics]);
+
+  const list = [];
+  for (const [devId, sprintMap] of conflicts) {
+    for (const [sprint, topicIds] of sprintMap) {
+      list.push({ devId, sprint, topicIds });
+    }
+  }
+  list.sort((a, b) => {
+    if (a.sprint !== b.sprint) return a.sprint - b.sprint;
+    const aName = devsById[a.devId]?.name ?? '';
+    const bName = devsById[b.devId]?.name ?? '';
+    return aName.localeCompare(bName);
+  });
+
+  const count = list.length;
+
+  return (
+    <section className="card">
+      <h2 className="card-title conflicts-title">
+        {count > 0 ? (
+          <AlertTriangle size={16} className="conflicts-title-warning" />
+        ) : (
+          <Check size={16} className="conflicts-title-ok" />
+        )}
+        <span>Conflicts{count > 0 ? ` (${count})` : ''}</span>
+      </h2>
+
+      {count === 0 ? (
+        <p className="conflicts-empty">
+          <Check size={14} className="conflicts-empty-icon" />
+          No resource conflicts detected
+        </p>
+      ) : (
+        <table className="conflicts-table">
+          <thead>
+            <tr>
+              <th>Developer</th>
+              <th>Sprint</th>
+              <th>Topics</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((c, i) => {
+              const dev = devsById[c.devId];
+              const qs = absToQS(c.sprint, state.quarters);
+              const sprintLabel = qs
+                ? `${qs.quarter.name} S${qs.sprint}`
+                : `S${c.sprint}`;
+              const topicNames = c.topicIds
+                .map((id) => topicsById[id]?.name ?? '?')
+                .join(', ');
+              return (
+                <tr key={i}>
+                  <td>{dev?.name ?? 'Unknown'}</td>
+                  <td>{sprintLabel}</td>
+                  <td>{topicNames}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }
 

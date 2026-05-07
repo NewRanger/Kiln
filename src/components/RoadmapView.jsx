@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Eraser } from 'lucide-react';
+import { AlertTriangle, Eraser } from 'lucide-react';
+import { computeConflicts, getTopicConflicts } from '../lib/conflicts.js';
 import { genId } from '../lib/defaults.js';
-import { formatSprintRange, sprintDates } from '../lib/schedule.js';
+import { absToQS, formatSprintRange, sprintDates } from '../lib/schedule.js';
 import TopicDetail from './TopicDetail.jsx';
 
 const ROLE_TRACKS = [
@@ -74,6 +75,20 @@ export default function RoadmapView({ state, setState }) {
     }
     return map;
   }, [quarters]);
+
+  const conflicts = useMemo(() => computeConflicts(state), [state.topics]);
+
+  const devsById = useMemo(() => {
+    const map = {};
+    for (const d of state.developers) map[d.id] = d;
+    return map;
+  }, [state.developers]);
+
+  const topicsById = useMemo(() => {
+    const map = {};
+    for (const t of state.topics) map[t.id] = t;
+    return map;
+  }, [state.topics]);
 
   const addTopic = () => {
     setState({
@@ -398,53 +413,69 @@ export default function RoadmapView({ state, setState }) {
         ))}
       </div>
 
-      {teamTopics.map((t) => (
-        <div className="topic-row" key={t.id} data-topic-id={t.id}>
-          <button
-            type="button"
-            className="topic-name"
-            onClick={() => setSelectedTopicId(t.id)}
-            title={t.name}
-          >
-            {t.name}
-          </button>
-          <div className="topic-tracks">
-            {ROLE_TRACKS.map(({ key, devRole }) => (
-              <div key={key} className="track">
-                {quarters.map((q) => (
-                  <div key={q.id} className="track-cells-group">
-                    {Array.from({ length: q.sprintCount }, (_, i) => {
-                      const absSprint = quarterOffsets[q.id] + i;
-                      const cellDevs = devsInTrack(
-                        t,
-                        absSprint,
-                        devRole,
-                        teamDevsByRole
-                      ).map((d) => ({
-                        ...d,
-                        isRightEdge: !(t.allocations?.[d.dev.id] || []).includes(absSprint + 1)
-                      }));
-                      return (
-                        <TrackCell
-                          key={i}
-                          absSprint={absSprint}
-                          devs={cellDevs}
-                          paintActive={activeTool != null}
-                          onPaint={(e) => handleCellMouseDown(e, t, absSprint)}
-                          onDragStart={(devId) => startDrag(t, devId, absSprint)}
-                          onMoveStart={(e, devId) =>
-                            startMove(e, t, devId, absSprint)
-                          }
-                        />
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            ))}
+      {teamTopics.map((t) => {
+        const topicConflicts = getTopicConflicts(conflicts, t.id);
+        const hasConflicts = topicConflicts.length > 0;
+        return (
+          <div className="topic-row" key={t.id} data-topic-id={t.id}>
+            <button
+              type="button"
+              className={`topic-name${hasConflicts ? ' topic-name-conflict' : ''}`}
+              onClick={() => setSelectedTopicId(t.id)}
+              title={t.name}
+            >
+              {hasConflicts && (
+                <ConflictBadge
+                  topicConflicts={topicConflicts}
+                  devsById={devsById}
+                  topicsById={topicsById}
+                  quarters={quarters}
+                />
+              )}
+              <span className="topic-name-text">{t.name}</span>
+            </button>
+            <div className="topic-tracks">
+              {ROLE_TRACKS.map(({ key, devRole }) => (
+                <div key={key} className="track">
+                  {quarters.map((q) => (
+                    <div key={q.id} className="track-cells-group">
+                      {Array.from({ length: q.sprintCount }, (_, i) => {
+                        const absSprint = quarterOffsets[q.id] + i;
+                        const cellDevs = devsInTrack(
+                          t,
+                          absSprint,
+                          devRole,
+                          teamDevsByRole
+                        ).map((d) => ({
+                          ...d,
+                          isRightEdge: !(t.allocations?.[d.dev.id] || []).includes(absSprint + 1)
+                        }));
+                        const isConflict = cellDevs.some(({ dev }) =>
+                          (conflicts.get(dev.id)?.get(absSprint)?.length ?? 0) >= 2
+                        );
+                        return (
+                          <TrackCell
+                            key={i}
+                            absSprint={absSprint}
+                            devs={cellDevs}
+                            paintActive={activeTool != null}
+                            isConflict={isConflict}
+                            onPaint={(e) => handleCellMouseDown(e, t, absSprint)}
+                            onDragStart={(devId) => startDrag(t, devId, absSprint)}
+                            onMoveStart={(e, devId) =>
+                              startMove(e, t, devId, absSprint)
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {teamTopics.length === 0 ? (
         <div className="roadmap-empty">
@@ -488,6 +519,49 @@ function SprintHeaderCell({ quarterName, sprintInQuarter, dateRange }) {
   );
 }
 
+function ConflictBadge({ topicConflicts, devsById, topicsById, quarters }) {
+  const sorted = [...topicConflicts].sort((a, b) => {
+    if (a.sprint !== b.sprint) return a.sprint - b.sprint;
+    const aName = devsById[a.devId]?.name ?? '';
+    const bName = devsById[b.devId]?.name ?? '';
+    return aName.localeCompare(bName);
+  });
+  const visible = sorted.slice(0, 5);
+  const extra = Math.max(0, sorted.length - 5);
+
+  const formatLine = (c) => {
+    const devName = devsById[c.devId]?.name ?? 'Unknown';
+    const others = c.otherTopicIds
+      .map((id) => topicsById[id]?.name ?? '?')
+      .join(', ');
+    const qs = absToQS(c.sprint, quarters);
+    const sprintLabel = qs ? `${qs.quarter.name} S${qs.sprint}` : `S${c.sprint}`;
+    return `${devName} also assigned to ${others} at ${sprintLabel}`;
+  };
+
+  return (
+    <span
+      className="topic-conflict-icon-wrap"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <AlertTriangle size={14} className="topic-conflict-icon" />
+      <span className="topic-conflict-tooltip" role="tooltip">
+        <span className="topic-conflict-tooltip-title">Resource conflicts:</span>
+        <span className="topic-conflict-tooltip-list">
+          {visible.map((c, i) => (
+            <span key={i} className="topic-conflict-tooltip-item">
+              · {formatLine(c)}
+            </span>
+          ))}
+          {extra > 0 && (
+            <span className="topic-conflict-tooltip-more">+ {extra} more</span>
+          )}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 function devsInTrack(topic, absSprint, devRole, teamDevsByRole) {
   const devs = teamDevsByRole[devRole] || [];
   const allocations = topic.allocations || {};
@@ -506,14 +580,17 @@ function TrackCell({
   absSprint,
   devs,
   paintActive,
+  isConflict,
   onPaint,
   onDragStart,
   onMoveStart
 }) {
-  const className = `track-cell${paintActive ? ' track-cell-paintable' : ''}`;
+  const classes = ['track-cell'];
+  if (paintActive) classes.push('track-cell-paintable');
+  if (isConflict) classes.push('track-cell-conflict');
   return (
     <div
-      className={className}
+      className={classes.join(' ')}
       data-abs-sprint={absSprint}
       onMouseDown={paintActive ? onPaint : undefined}
     >
