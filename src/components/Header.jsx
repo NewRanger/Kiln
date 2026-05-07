@@ -1,10 +1,16 @@
-import { FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet, Moon, Sun } from 'lucide-react';
 import { version } from '../../package.json';
 
 const STATUS_LABEL = {
   saved: 'Saved',
   saving: 'Saving…',
   error: 'Error'
+};
+
+const THEME_LABEL = {
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark'
 };
 
 export default function Header({
@@ -14,8 +20,14 @@ export default function Header({
   saveStatus,
   activeTeam,
   onDistribute,
-  onExportExcel
+  onExportExcel,
+  themePref,
+  effectiveTheme,
+  onCycleTheme
 }) {
+  const ThemeIcon = effectiveTheme === 'dark' ? Moon : Sun;
+  const themeTitle = `Theme: ${THEME_LABEL[themePref] ?? 'System'}`;
+
   return (
     <header className="header">
       <div className="header-left">
@@ -50,6 +62,15 @@ export default function Header({
           title="Export to Excel"
         >
           <FileSpreadsheet size={16} />
+        </button>
+        <button
+          type="button"
+          className="header-icon-button"
+          onClick={onCycleTheme}
+          aria-label={themeTitle}
+          title={themeTitle}
+        >
+          <ThemeIcon size={16} />
         </button>
         <button
           type="button"

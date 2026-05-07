@@ -50,6 +50,7 @@ export function getDefaultState() {
     ],
     sprintCalendar: { yearStart: '2026-01-05', sprintLengthWeeks: 2 },
     now: { quarter: 'Q1', sprint: 1 },
-    activeTeamId: teamId
+    activeTeamId: teamId,
+    theme: 'system'
   };
 }

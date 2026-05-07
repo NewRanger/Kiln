@@ -1,3 +1,65 @@
+/* ========== Theme variables ========== */
+
+:root {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-hover: #faf9f4;
+  --border: #ebe8e0;
+  --border-strong: #d8d4c8;
+  --text: #1f1f1d;
+  --text-muted: #5f5f5c;
+  --text-faint: #9a9a98;
+  --hover: rgba(0, 0, 0, 0.04);
+  --accent: #6e4fab;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-drawer: -4px 0 24px rgba(0, 0, 0, 0.12);
+  --success: #4caf50;
+  --warning: #d4a24c;
+  --danger: #d65a4e;
+  --header-bg: #1f1f1d;
+  --header-text: #f5f5f3;
+  --pill-success-bg: rgba(76, 175, 80, 0.16);
+  --pill-success-fg: #2e7d32;
+  --pill-warning-bg: rgba(212, 162, 76, 0.18);
+  --pill-warning-fg: #8a5a13;
+  --pill-danger-bg: rgba(214, 90, 78, 0.16);
+  --pill-danger-fg: #b03a30;
+  --cell: #ebe8e0;
+  --cell-alt: #f1eee5;
+}
+
+[data-theme="dark"] {
+  --bg: #0e0e10;
+  --surface: #161618;
+  --surface-elevated: #1c1c1f;
+  --surface-hover: #1c1c1f;
+  --border: #2a2a2c;
+  --border-strong: #3a3a3d;
+  --text: #e8e8e6;
+  --text-muted: #8a8a88;
+  --text-faint: #5a5a58;
+  --hover: rgba(255, 255, 255, 0.04);
+  --accent: #8e6ec9;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-drawer: -4px 0 24px rgba(0, 0, 0, 0.5);
+  --success: #6cc777;
+  --warning: #e0b264;
+  --danger: #e57366;
+  --header-bg: #1c1c1f;
+  --header-text: #e8e8e6;
+  --pill-success-bg: rgba(108, 199, 119, 0.18);
+  --pill-success-fg: #6cc777;
+  --pill-warning-bg: rgba(224, 178, 100, 0.2);
+  --pill-warning-fg: #e0b264;
+  --pill-danger-bg: rgba(229, 115, 102, 0.18);
+  --pill-danger-fg: #e57366;
+  --cell: #161618;
+  --cell-alt: #1a1a1c;
+}
+
+/* ========== Resets and globals ========== */
+
 *,
 *::before,
 *::after {
@@ -15,8 +77,8 @@ body,
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
     Ubuntu, Cantarell, sans-serif;
-  background: #fafaf8;
-  color: #1f1f1d;
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -57,8 +119,8 @@ button {
   height: 56px;
   flex: 0 0 56px;
   padding: 0 1.25rem;
-  background: #1f1f1d;
-  color: #f5f5f3;
+  background: var(--header-bg);
+  color: var(--header-text);
 }
 
 .header-left {
@@ -139,7 +201,7 @@ button {
 .distribute-button {
   appearance: none;
   border: 0;
-  background: #6e4fab;
+  background: var(--accent);
   color: #fff;
   padding: 0.4rem 0.875rem;
   border-radius: 6px;
@@ -174,6 +236,7 @@ button {
   background: #6b6b6b;
 }
 
+/* Status indicator dots keep fixed colors in both modes (per spec) */
 .save-indicator-saved .save-dot {
   background: #4caf50;
 }
@@ -195,7 +258,7 @@ button {
   flex: 1 1 auto;
   overflow: auto;
   padding: 2rem 2.5rem;
-  background: #fafaf8;
+  background: var(--bg);
 }
 
 /* Settings */
@@ -233,8 +296,8 @@ button {
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #ebe8e0;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 1.5rem;
 }
@@ -262,25 +325,25 @@ button {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 .field-input {
   appearance: none;
-  border: 1px solid #d8d4c8;
-  background: #fff;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-elevated);
   border-radius: 6px;
   padding: 0.5rem 0.65rem;
   font-size: 0.9375rem;
-  color: inherit;
+  color: var(--text);
   font-family: inherit;
   outline: none;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .field-input:focus {
-  border-color: #6E4FAB;
-  box-shadow: 0 0 0 3px rgba(110, 79, 171, 0.15);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .field-input--small {
@@ -323,10 +386,10 @@ button {
 
 .role-range {
   width: 100%;
-  accent-color: #6E4FAB;
+  accent-color: var(--accent);
 }
 
-/* Quarters */
+/* Quarters (Settings) */
 .quarter-list {
   display: flex;
   flex-direction: column;
@@ -338,7 +401,7 @@ button {
   align-items: center;
   gap: 1rem;
   padding: 0.625rem 0;
-  border-top: 1px solid #f1eee5;
+  border-top: 1px solid var(--border);
 }
 
 .settings-quarter-row:first-child {
@@ -363,7 +426,7 @@ button {
 
 .quarter-sprints-suffix {
   font-size: 0.8125rem;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 .color-input {
@@ -372,7 +435,7 @@ button {
   width: 28px;
   height: 28px;
   padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   background: transparent;
   cursor: pointer;
@@ -405,7 +468,7 @@ button {
   align-items: center;
   gap: 0.625rem;
   padding: 0.4rem 0;
-  border-top: 1px solid #f1eee5;
+  border-top: 1px solid var(--border);
 }
 
 .category-row {
@@ -430,14 +493,14 @@ button {
 
 .percent-suffix {
   font-size: 0.8125rem;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 .icon-button {
   appearance: none;
   border: 0;
   background: transparent;
-  color: #9c9890;
+  color: var(--text-faint);
   width: 28px;
   height: 28px;
   padding: 0;
@@ -450,16 +513,16 @@ button {
 }
 
 .icon-button:hover {
-  background: rgba(214, 90, 78, 0.1);
-  color: #d65a4e;
+  background: var(--pill-danger-bg);
+  color: var(--danger);
 }
 
 .add-button {
   margin-top: 0.875rem;
   appearance: none;
   background: transparent;
-  border: 1px dashed #c9c4b5;
-  color: #6a675f;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-muted);
   padding: 0.5rem 0.875rem;
   border-radius: 6px;
   cursor: pointer;
@@ -469,19 +532,19 @@ button {
 }
 
 .add-button:hover {
-  border-color: #6e4fab;
-  color: #6e4fab;
-  background: rgba(110, 79, 171, 0.04);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 .row-total {
   margin: 0.875rem 0 0;
   font-size: 0.8125rem;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 .row-total-warn {
-  color: #b07a1c;
+  color: var(--warning);
   font-weight: 500;
 }
 
@@ -508,7 +571,7 @@ button {
 .sprint-row {
   position: sticky;
   z-index: 3;
-  background: #fafaf8;
+  background: var(--bg);
 }
 
 .quarter-row { top: 48px; }
@@ -519,7 +582,7 @@ button {
   left: 0;
   width: var(--topic-col-width);
   flex-shrink: 0;
-  background: #fafaf8;
+  background: var(--bg);
   cursor: default;
 }
 
@@ -577,17 +640,18 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ebe8e0;
+  background: var(--cell);
   font-size: 0.75rem;
-  color: #6a675f;
+  color: var(--text-muted);
   letter-spacing: 0.04em;
   cursor: default;
 }
 
 .sprint-cell:nth-child(even) {
-  background: #f1eee5;
+  background: var(--cell-alt);
 }
 
+/* Tooltip — always dark in both light AND dark mode (tooltip convention) */
 .sprint-tooltip {
   position: absolute;
   bottom: calc(100% + 6px);
@@ -640,8 +704,8 @@ button {
 
 .topic-row {
   height: 64px;
-  background: #fff;
-  border-bottom: 1px solid #ebe8e0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .topic-name {
@@ -650,7 +714,7 @@ button {
   z-index: 1;
   width: var(--topic-col-width);
   flex-shrink: 0;
-  background: #fff;
+  background: var(--surface);
   display: flex;
   align-items: center;
   padding: 0 1rem;
@@ -659,7 +723,7 @@ button {
   color: inherit;
   text-align: left;
   border: 0;
-  border-right: 1px solid #ebe8e0;
+  border-right: 1px solid var(--border);
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -668,7 +732,7 @@ button {
 }
 
 .topic-name:hover {
-  background: #faf9f4;
+  background: var(--surface-hover);
 }
 
 .topic-tracks {
@@ -717,6 +781,7 @@ button {
   opacity: 0.5;
 }
 
+/* Handle sits on top of the dev's color — keep semi-transparent black in both modes */
 .track-cell-fill-handle {
   position: absolute;
   top: 0;
@@ -747,7 +812,7 @@ button {
 }
 
 .track-cell-paintable:hover {
-  outline: 2px solid rgba(31, 31, 29, 0.35);
+  outline: 2px solid color-mix(in srgb, var(--text) 35%, transparent);
   outline-offset: -2px;
 }
 
@@ -758,8 +823,8 @@ button {
   top: 0;
   z-index: 2;
   height: 48px;
-  background: #fff;
-  border-bottom: 1px solid #ebe8e0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .paint-toolbar-inner {
@@ -776,7 +841,7 @@ button {
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 .paint-chips {
@@ -806,13 +871,13 @@ button {
 }
 
 .paint-chip-active {
-  box-shadow: 0 0 0 2px #1f1f1d;
+  box-shadow: 0 0 0 2px var(--text);
 }
 
 .paint-chip-eraser {
-  background: #fff;
-  border: 1px solid #c9c4b5;
-  color: #6a675f;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
 }
 
 .roadmap-empty {
@@ -827,7 +892,7 @@ button {
 .roadmap-empty-text {
   margin: 0;
   font-size: 0.9375rem;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 .roadmap-empty .add-button,
@@ -858,9 +923,9 @@ button {
   bottom: 0;
   width: 480px;
   max-width: 100%;
-  background: #fff;
+  background: var(--surface-elevated);
   z-index: 101;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-drawer);
   display: flex;
   flex-direction: column;
   transform: translateX(100%);
@@ -884,8 +949,8 @@ button {
 }
 
 .drawer-close:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #1f1f1d;
+  background: var(--hover);
+  color: var(--text);
 }
 
 .drawer-content {
@@ -929,7 +994,7 @@ button {
   margin: 0.75rem 0;
   appearance: none;
   border: 0;
-  background: #6e4fab;
+  background: var(--accent);
   color: #fff;
   font-weight: 600;
   font-family: inherit;
@@ -954,8 +1019,8 @@ button {
   margin: 0.75rem 0;
   appearance: none;
   background: transparent;
-  border: 1px solid #d65a4e;
-  color: #d65a4e;
+  border: 1px solid var(--danger);
+  color: var(--danger);
   font-weight: 600;
   font-family: inherit;
   font-size: 0.875rem;
@@ -971,7 +1036,7 @@ button {
 }
 
 .delete-topic-button:hover {
-  background: rgba(214, 90, 78, 0.08);
+  background: var(--pill-danger-bg);
 }
 
 /* Sprint picker */
@@ -1006,10 +1071,10 @@ button {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: #fff;
-  border: 1px solid #ebe8e0;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow);
   padding: 0.875rem;
   z-index: 10;
   display: flex;
@@ -1022,7 +1087,7 @@ button {
   align-items: center;
   gap: 0.625rem;
   padding-left: 0.625rem;
-  border-left: 4px solid #c9c4b5;
+  border-left: 4px solid var(--border-strong);
 }
 
 .sprint-picker-row-label {
@@ -1030,7 +1095,7 @@ button {
   font-weight: 600;
   width: 28px;
   flex-shrink: 0;
-  color: #1f1f1d;
+  color: var(--text);
 }
 
 .sprint-picker-pills {
@@ -1043,8 +1108,8 @@ button {
   position: relative;
   appearance: none;
   border: 0;
-  background: #ebe8e0;
-  color: #1f1f1d;
+  background: var(--border);
+  color: var(--text);
   width: 32px;
   height: 28px;
   font-size: 0.75rem;
@@ -1058,7 +1123,7 @@ button {
 }
 
 .sprint-pill:hover {
-  background: #d8d4c8;
+  background: var(--border-strong);
 }
 
 .sprint-pill-selected {
@@ -1087,19 +1152,19 @@ button {
   font-size: 0.7rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #6a675f;
+  color: var(--text-muted);
   margin-bottom: 0.5rem;
 }
 
 .capacity-subtitle {
   margin: 0 0 1rem;
   font-size: 0.9375rem;
-  color: #4a473f;
+  color: var(--text-muted);
 }
 
 .capacity-bar {
   height: 12px;
-  background: #ebe8e0;
+  background: var(--border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -1127,13 +1192,13 @@ button {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 .role-card-meta {
   margin-top: 0.25rem;
   font-size: 0.75rem;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 .role-card-capacity {
@@ -1147,7 +1212,7 @@ button {
 .role-card-label {
   margin-top: 0.15rem;
   font-size: 0.65rem;
-  color: #6a675f;
+  color: var(--text-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1155,25 +1220,25 @@ button {
 .role-card-progress {
   margin-top: 0.875rem;
   height: 6px;
-  background: #ebe8e0;
+  background: var(--border);
   border-radius: 3px;
   overflow: hidden;
 }
 
 .role-card-progress-fill {
   height: 100%;
-  background: #4caf50;
+  background: var(--success);
   transition: width 200ms ease;
 }
 
 .role-card-progress-fill-over {
-  background: #d4a24c;
+  background: var(--warning);
 }
 
 .role-card-ratio {
   margin-top: 0.5rem;
   font-size: 0.8125rem;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 /* Categories table */
@@ -1187,7 +1252,7 @@ button {
 .categories-table td {
   text-align: left;
   padding: 0.625rem 0.5rem;
-  border-bottom: 1px solid #f1eee5;
+  border-bottom: 1px solid var(--border);
 }
 
 .categories-table th.num,
@@ -1201,18 +1266,18 @@ button {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6a675f;
+  color: var(--text-muted);
 }
 
 .categories-table tfoot td {
   font-weight: 600;
   border-bottom: 0;
-  border-top: 2px solid #ebe8e0;
+  border-top: 2px solid var(--border);
 }
 
 .categories-empty {
   text-align: center;
-  color: #6a675f;
+  color: var(--text-muted);
   padding: 1rem !important;
 }
 
@@ -1240,16 +1305,16 @@ button {
 }
 
 .status-pill-on-track {
-  background: rgba(76, 175, 80, 0.16);
-  color: #2e7d32;
+  background: var(--pill-success-bg);
+  color: var(--pill-success-fg);
 }
 
 .status-pill-under {
-  background: rgba(212, 162, 76, 0.18);
-  color: #8a5a13;
+  background: var(--pill-warning-bg);
+  color: var(--pill-warning-fg);
 }
 
 .status-pill-over {
-  background: rgba(214, 90, 78, 0.16);
-  color: #b03a30;
+  background: var(--pill-danger-bg);
+  color: var(--pill-danger-fg);
 }
